@@ -1,43 +1,83 @@
 import flet as ft
+from views import BaseView
+from mixins import AppMixin
+import os
+from functools import cached_property
 
-class App:
-    views = {}
-
+class BaseApp:
+    
     def __init__(self) -> None:
         self.load_builtin_views()
 
-    def __call__(self, page : ft.Page, title : str = "HomePage"):
+    def __call__(self, page : ft.Page):
         page.on_route_change = self.on_route_change
         page.on_view_pop = self.on_view_pop
-        self.route = page.route
         self.page = page
-        page.title = title
-        return self.prefix_render(page)
 
+        self.clear_page()
+        return self.navigate_to(self.route)
 
-    def on_route_change(self, event: ft.RouteChangeEvent):
+    def clear_page(self):
+        self.page.views.clear()
 
-        #condition to prevent duplicate screens when returning back
-        if  not event.route == self.top_view.route:
-            self.page.views.append(
-                ft.View(
-                    event.route,
-                    self.views.get(event.route, self.views['/404'])(self.page)
-                )
-            )
+    def load_builtin_views(self):
+        raise NotImplementedError("load_builtin_views must be implemented")
 
+    def on_route_change(self, event : ft.RouteChangeEvent):
+        raise NotImplementedError("on_route_change must be implemented")
+
+    def on_view_pop(self, event : ft.ViewPopEvent):
+        return self.page.views.pop()
+
+    def pre_render(self):
+        """method used to do some stuff before rendering the HomePage"""
+
+    def update_page(self):
+        """we used it to update the page so we can override to do things before every upload"""
         self.page.update()
 
-        
+    def post_render(self):
+        """method used if needed to do some stuff after adding the controls to the homepage"""
+
+class App(BaseApp, AppMixin):
+    """Main app with benefitial utilities"""
+    
+    views = {}
+
+    def get_view(self, route=None):
+        if not route:
+            route = "/"
+
+        troute = ft.TemplateRoute(route)
+        route_kwargs = {}
+        for _route in self.app_view.keys():
+            if troute.match(_route):
+                route_kwargs = troute._TemplateRoute__last_params
+                route = _route
+                view = self.views[_route]
+                view = view.create_view if type(view) == BaseView else view 
+                break
+        else:
+            if not view:
+                view = self.views['/404']
+
+        return ft.View(
+                route,
+                view(self.page, **route_kwargs)
+            )
+
+    def on_route_change(self, event: ft.RouteChangeEvent):
+        self.page.views.append(
+            self.get_view(route = event.route)
+        )
+        self.pre_render()
+        self.update_page()
+        self.post_render()
+ 
     def on_view_pop(self, event : ft.ViewPopEvent):
-        self.page.views.pop()
-        self.page.go(self.top_view.route)
-
-
-    def prefix_render(self, page : ft.Page):
-        """method used to do some stuff before rendering the HomePage"""
-        return page.go("/")
-
+        super().on_view_pop(event)        
+        self.update_page()
+        
     def view_404(self, page : ft.Page):
         return [
                 ft.AppBar(title=ft.Text("Flet app")),
@@ -61,11 +101,22 @@ class App:
         return decorator
 
     @property
-    def top_view(self):
-        return self.page.views[-1]
-
-    @property
     def previous_route(self):
         if len(self.page.views) > 1:
             return self.page.views[-2].route
-        return self.page.views[-1].route
+        return None
+
+    def refresh_page(self):
+        view = self.all_views.pop()
+        self.navigate_to(view.route)
+
+    def navigate_to(self, route : str):
+        route_event = ft.RouteChangeEvent(route=route)
+        self.on_route_change(route_event)
+
+    @cached_property
+    def app_view(self):
+        return self.views
+
+app = App()
+
