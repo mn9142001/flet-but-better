@@ -60,7 +60,7 @@ class App(BaseApp, AppMixin):
         else:
             if not view:
                 view = self.views['/404']
-
+        
         return ft.View(
                 route,
                 view(self.page, **route_kwargs)
@@ -107,8 +107,13 @@ class App(BaseApp, AppMixin):
         return None
 
     def refresh_page(self):
+        if getattr(self, 'refreshing', False):
+            return
+
+        self.refreshing = True
         view = self.all_views.pop()
         self.navigate_to(view.route)
+        self.refreshing = False
 
     def navigate_to(self, route : str):
         route_event = ft.RouteChangeEvent(route=route)
