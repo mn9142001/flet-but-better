@@ -28,9 +28,9 @@ class View(AppMixin, metaclass=BaseView):
     @classmethod
     def create_view(cls, page : ft.Page, *args, **kwargs) :
         view : View = cls(page, *args, **kwargs)
-        return view.render(page)
+        return view.render(page, *args, **kwargs)
 
-    def render(self, page):
+    def render(self, page, **kwargs):
         "to render your page"
         raise NotImplementedError("render method must be implemented")
 

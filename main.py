@@ -44,15 +44,17 @@ class App(BaseApp, AppMixin):
     
     views = {}
 
-    def get_view(self, route=None):
+    def get_view(self, route=None, **kwargs):
         if not route:
             route = "/"
 
         troute = ft.TemplateRoute(route)
         route_kwargs = {}
+        route_kwargs.update(kwargs)
+
         for _route in self.app_view.keys():
             if troute.match(_route):
-                route_kwargs = troute._TemplateRoute__last_params
+                route_kwargs.update(troute._TemplateRoute__last_params)
                 route = _route
                 view = self.views[_route]
                 view = view.create_view if type(view) == BaseView else view 
@@ -66,9 +68,9 @@ class App(BaseApp, AppMixin):
                 view(self.page, **route_kwargs)
             )
 
-    def on_route_change(self, event: ft.RouteChangeEvent):
+    def on_route_change(self, event: ft.RouteChangeEvent, **kwargs):
         self.page.views.append(
-            self.get_view(route = event.route)
+            self.get_view(route = event.route, **kwargs)
         )
         self.pre_render()
         self.update_page()
@@ -115,9 +117,9 @@ class App(BaseApp, AppMixin):
         self.navigate_to(view.route)
         self.refreshing = False
 
-    def navigate_to(self, route : str):
+    def navigate_to(self, route : str, context = {}):
         route_event = ft.RouteChangeEvent(route=route)
-        self.on_route_change(route_event)
+        self.on_route_change(route_event, **context)
 
     @cached_property
     def app_view(self):
